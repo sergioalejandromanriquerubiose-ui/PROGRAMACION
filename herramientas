@@ -1,0 +1,84 @@
+"""
+============================================================
+  ANÁLISIS DE UTILIDAD DE BANCOLOMBIA (2005 - PRESENTE)
+  Sistema modular de análisis financiero con API de datos
+============================================================
+Autor: Análisis Financiero Bancolombia
+Descripción: Analiza la utilidad neta de Bancolombia usando
+             datos locales (Excel) y datos de API pública.
+"""
+
+# ── Importaciones estándar ──────────────────────────────────
+import sys
+import os
+
+# ── Importaciones de módulos propios ───────────────────────
+from modules.data_loader   import DataLoader
+from modules.api_fetcher   import BancolombiaAPIFetcher
+from modules.analyzer      import UtilityAnalyzer
+from modules.visualizer    import FinancialVisualizer
+from modules.reporter      import ReportGenerator
+
+
+def main():
+    """Punto de entrada principal del programa."""
+
+    print("=" * 60)
+    print("  ANÁLISIS DE UTILIDAD - BANCOLOMBIA (2005-PRESENTE)")
+    print("=" * 60)
+
+    # ── 1. Cargar datos desde Excel ─────────────────────────
+    print("\n[1/5] Cargando datos desde archivo Excel...")
+    loader = DataLoader(filepath="data/bancolombia_utilidad.xlsx")
+    df_local = loader.load()
+
+    if df_local is None or df_local.empty:
+        print("  ✗ No se encontró el archivo Excel.")
+        print("    Generando datos de demostración...")
+        df_local = loader.generate_sample_data()
+    else:
+        print(f"  ✓ {len(df_local)} registros cargados desde Excel.")
+
+    # ── 2. Obtener datos complementarios de API ─────────────
+    print("\n[2/5] Consultando API de datos financieros...")
+    fetcher = BancolombiaAPIFetcher()
+    df_api  = fetcher.fetch_stock_data()
+
+    if df_api is not None and not df_api.empty:
+        print(f"  ✓ {len(df_api)} registros obtenidos de la API.")
+    else:
+        print("  ⚠ API no disponible. Se usarán solo datos locales.")
+        df_api = None
+
+    # ── 3. Analizar datos ───────────────────────────────────
+    print("\n[3/5] Analizando utilidades...")
+    analyzer = UtilityAnalyzer(df_local, df_api)
+    results  = analyzer.run_full_analysis()
+
+    print(f"  ✓ CAGR (2005-presente): {results['cagr']:.2f}%")
+    print(f"  ✓ Mejor año: {results['best_year']} "
+          f"(COP {results['best_value']:,.0f} MM)")
+    print(f"  ✓ Peor año:  {results['worst_year']} "
+          f"(COP {results['worst_value']:,.0f} MM)")
+    print(f"  ✓ Promedio anual: COP {results['mean']:,.0f} MM")
+
+    # ── 4. Generar visualizaciones ──────────────────────────
+    print("\n[4/5] Generando gráficas...")
+    viz = FinancialVisualizer(analyzer.df)
+    viz.plot_all(output_dir="output/")
+    print("  ✓ Gráficas guardadas en carpeta output/")
+
+    # ── 5. Generar reporte ──────────────────────────────────
+    print("\n[5/5] Generando reporte de texto...")
+    reporter = ReportGenerator(analyzer.df, results)
+    reporter.print_report()
+    reporter.save_report("output/reporte_bancolombia.txt")
+    print("  ✓ Reporte guardado en output/reporte_bancolombia.txt")
+
+    print("\n" + "=" * 60)
+    print("  ✔ Análisis completado exitosamente.")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
